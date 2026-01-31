@@ -70,3 +70,6 @@ IGNORED_TYPES = ["light"]
 IMAGE_TYPE_BIAS = 1
 IMAGE_TYPE_DARK = 2
 IMAGE_TYPE_FLAT = 3
+
+# Timeout for PixInsight execution in seconds (2 hours for large datasets)
+PIXINSIGHT_TIMEOUT = 7200
