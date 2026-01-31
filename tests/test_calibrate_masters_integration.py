@@ -629,7 +629,7 @@ class TestCLI:
         mock_run_pi.assert_not_called()
 
     @patch("ap_master_calibration.calibrate_masters.generate_masters")
-    def test_cli_requires_pixinsight_binary_for_execution(self, mock_generate, capsys):
+    def test_cli_requires_pixinsight_binary_for_execution(self, mock_generate, caplog):
         """Test that --pixinsight-binary is required without --script-only."""
         mock_generate.return_value = ["/tmp/script.js"]
 
@@ -643,9 +643,7 @@ class TestCLI:
             exit_code = main()
 
         assert exit_code == 1
-        captured = capsys.readouterr()
-        assert "ERROR" in captured.out
-        assert "pixinsight-binary" in captured.out.lower()
+        assert "pixinsight-binary" in caplog.text.lower()
 
     @patch("ap_master_calibration.calibrate_masters.generate_masters")
     @patch("ap_master_calibration.calibrate_masters.run_pixinsight")
@@ -710,8 +708,11 @@ class TestCLI:
         assert call_args[0][3] == "/darks"
 
     @patch("ap_master_calibration.calibrate_masters.generate_masters")
-    def test_cli_handles_no_frames_found(self, mock_generate, capsys):
+    def test_cli_handles_no_frames_found(self, mock_generate, caplog):
         """Test CLI handles case where no frames are found."""
+        import logging
+
+        caplog.set_level(logging.INFO)
         mock_generate.return_value = []
 
         test_args = [
@@ -725,8 +726,7 @@ class TestCLI:
             exit_code = main()
 
         assert exit_code == 0
-        captured = capsys.readouterr()
-        assert "No calibration frames found" in captured.out
+        assert "No calibration frames found" in caplog.text
 
     @patch("ap_master_calibration.calibrate_masters.generate_masters")
     @patch("ap_master_calibration.calibrate_masters.run_pixinsight")
@@ -754,7 +754,7 @@ class TestCLI:
         assert exit_code == 1
 
     @patch("ap_master_calibration.calibrate_masters.generate_masters")
-    def test_cli_handles_exception_gracefully(self, mock_generate, capsys):
+    def test_cli_handles_exception_gracefully(self, mock_generate, caplog):
         """Test that CLI handles exceptions and returns error code."""
         mock_generate.side_effect = RuntimeError("Simulated error")
 
@@ -769,9 +769,7 @@ class TestCLI:
             exit_code = main()
 
         assert exit_code == 1
-        captured = capsys.readouterr()
-        assert "ERROR" in captured.err
-        assert "Simulated error" in captured.err
+        assert "Simulated error" in caplog.text
 
 
 class TestPixInsightExecution:

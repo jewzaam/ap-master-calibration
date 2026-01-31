@@ -5,6 +5,7 @@ Main entry point for calibration master generation.
 """
 
 import argparse
+import logging
 import subprocess
 import sys
 from datetime import datetime
@@ -16,7 +17,10 @@ import ap_common
 from . import config
 from .grouping import group_files, get_group_metadata
 from .master_matching import find_matching_master_for_flat
-from .script_generator import generate_combined_script
+from .script_generator import generate_combined_script, generate_master_filename
+
+# Configure module logger
+logger = logging.getLogger(__name__)
 
 
 def generate_masters(
@@ -56,7 +60,7 @@ def generate_masters(
     script_dir.mkdir(parents=True, exist_ok=True)
 
     # Discover files using ap-common get_filtered_metadata
-    print(f"Discovering calibration files in: {input_dir}")
+    logger.info("Discovering calibration files in: %s", input_dir)
 
     # Get files for each type using get_filtered_metadata
     files_by_type = {}
@@ -77,14 +81,14 @@ def generate_masters(
                 {"path": filename, "headers": headers}
                 for filename, headers in metadata.items()
             ]
-        except Exception as e:
-            print(f"Warning: Failed to discover {frame_type} files: {e}")
+        except (OSError, ValueError, KeyError) as e:
+            logger.warning("Failed to discover %s files: %s", frame_type, e)
             files_by_type[frame_type] = []
 
-    print("Found files:")
-    print(f"  Bias: {len(files_by_type['bias'])}")
-    print(f"  Dark: {len(files_by_type['dark'])}")
-    print(f"  Flat: {len(files_by_type['flat'])}")
+    logger.info("Found files:")
+    logger.info("  Bias: %d", len(files_by_type['bias']))
+    logger.info("  Dark: %d", len(files_by_type['dark']))
+    logger.info("  Flat: %d", len(files_by_type['flat']))
 
     # Collect all groups for combined script
     bias_groups_list = []
@@ -93,29 +97,29 @@ def generate_masters(
 
     # Process bias frames
     if files_by_type["bias"]:
-        print("\nProcessing bias frames...")
+        logger.info("Processing bias frames...")
         bias_groups = group_files(files_by_type["bias"], "bias")
 
         for group_key, group_files_list in bias_groups.items():
             metadata = get_group_metadata(group_files_list[0]["headers"], "bias")
             file_paths = [f["path"] for f in group_files_list]
             bias_groups_list.append((metadata, file_paths))
-            print(f"  Group: {len(file_paths)} files")
+            logger.info("  Group: %d files", len(file_paths))
 
     # Process dark frames
     if files_by_type["dark"]:
-        print("\nProcessing dark frames...")
+        logger.info("Processing dark frames...")
         dark_groups = group_files(files_by_type["dark"], "dark")
 
         for group_key, group_files_list in dark_groups.items():
             metadata = get_group_metadata(group_files_list[0]["headers"], "dark")
             file_paths = [f["path"] for f in group_files_list]
             dark_groups_list.append((metadata, file_paths))
-            print(f"  Group: {len(file_paths)} files")
+            logger.info("  Group: %d files", len(file_paths))
 
     # Process flat frames
     if files_by_type["flat"]:
-        print("\nProcessing flat frames...")
+        logger.info("Processing flat frames...")
         flat_groups = group_files(files_by_type["flat"], "flat")
 
         for group_key, group_files_list in flat_groups.items():
@@ -128,15 +132,7 @@ def generate_masters(
             master_dark_xisf = None
 
             # Extract exposure times from all flats in group for dark matching
-            flat_exposure_times = []
-            for file_info in group_files_list:
-                headers = file_info["headers"]
-                exposure = headers.get(config.KEYWORD_EXPOSURESECONDS)
-                if exposure is not None:
-                    try:
-                        flat_exposure_times.append(float(exposure))
-                    except (ValueError, TypeError):
-                        pass
+            flat_exposure_times = _extract_exposure_times(group_files_list)
 
             if bias_master_dir:
                 master_bias_xisf = find_matching_master_for_flat(
@@ -154,15 +150,15 @@ def generate_masters(
             flat_groups_list.append(
                 (metadata, file_paths, master_bias_xisf, master_dark_xisf)
             )
-            print(f"  Group: {len(file_paths)} files")
+            logger.info("  Group: %d files", len(file_paths))
             if master_bias_xisf:
-                print(f"    Using bias master: {Path(master_bias_xisf).name}")
+                logger.info("    Using bias master: %s", Path(master_bias_xisf).name)
             if master_dark_xisf:
-                print(f"    Using dark master: {Path(master_dark_xisf).name}")
+                logger.info("    Using dark master: %s", Path(master_dark_xisf).name)
 
     # Generate single combined script
     if bias_groups_list or dark_groups_list or flat_groups_list:
-        print("\nGenerating combined script...")
+        logger.info("Generating combined script...")
 
         # Create calibrated directories for flat groups (if using masters)
         if flat_groups_list:
@@ -174,8 +170,6 @@ def generate_masters(
             ) in flat_groups_list:
                 if master_bias_xisf or master_dark_xisf:
                     # Only create calibrated directory if we're actually calibrating
-                    from .script_generator import generate_master_filename
-
                     master_name = generate_master_filename(metadata, "flat")
                     calibrated_dir = output_path / "calibrated" / master_name
                     calibrated_dir.mkdir(parents=True, exist_ok=True)
@@ -198,8 +192,8 @@ def generate_masters(
 
         script_path = script_dir / f"{timestamp}_calibrate_masters.js"
         script_path.write_text(combined_script, encoding="utf-8")
-        print(f"  Generated: {script_path.name}")
-        print(f"  Console output will be logged to: {log_file_path.name}")
+        logger.info("  Generated: %s", script_path.name)
+        logger.info("  Console output will be logged to: %s", log_file_path.name)
         return [str(script_path)]
 
     return []
@@ -237,12 +231,12 @@ def run_pixinsight(
         script_path.parent / f"{script_path.stem.replace('_calibrate_masters', '')}.log"
     )
 
-    print("\nExecuting PixInsight...")
-    print(f"  Binary: {pixinsight_binary}")
-    print(f"  Script: {script_path}")
-    print(f"  Console log: {log_file}")
-    print(f"  Instance ID: {instance_id}")
-    print("  Automation mode: enabled")
+    logger.info("Executing PixInsight...")
+    logger.info("  Binary: %s", pixinsight_binary)
+    logger.info("  Script: %s", script_path)
+    logger.info("  Console log: %s", log_file)
+    logger.info("  Instance ID: %d", instance_id)
+    logger.info("  Automation mode: enabled")
 
     # Build command: PixInsight --automation-mode -n=<instance_id> -r=<script_path> --force-exit
     # Note: PixInsight requires equals sign format, not space-separated arguments
@@ -256,9 +250,9 @@ def run_pixinsight(
 
     if force_exit:
         cmd.append("--force-exit")
-        print("  Force exit: enabled")
+        logger.info("  Force exit: enabled")
 
-    print(f"\nRunning: {' '.join(cmd)}\n")
+    logger.info("Running: %s", ' '.join(cmd))
 
     # Execute and wait for completion
     # Console output is logged by PixInsight via Console.beginLog() in the script
@@ -269,20 +263,53 @@ def run_pixinsight(
             stderr=subprocess.STDOUT,
             check=False,
             text=True,
+            timeout=config.PIXINSIGHT_TIMEOUT,
         )
 
-        # Print any stderr/stdout from the process itself (e.g., GPU warnings)
+        # Log any stderr/stdout from the process itself (e.g., GPU warnings)
         if result.stdout:
-            print(result.stdout)
+            logger.info(result.stdout)
 
         return result.returncode
-    except Exception as e:
-        print(f"ERROR: Failed to execute PixInsight: {e}", file=sys.stderr)
+    except subprocess.TimeoutExpired:
+        logger.error("PixInsight execution timed out after %d seconds", config.PIXINSIGHT_TIMEOUT)
         raise
+    except OSError as e:
+        logger.error("Failed to execute PixInsight: %s", e)
+        raise
+
+
+def _extract_exposure_times(files: List[Dict]) -> List[float]:
+    """
+    Extract exposure times from a list of file info dicts.
+
+    Args:
+        files: List of file info dicts with "headers" keys
+
+    Returns:
+        List of exposure times as floats (empty if none found)
+    """
+    exposure_times = []
+    for file_info in files:
+        headers = file_info["headers"]
+        exposure = headers.get(config.KEYWORD_EXPOSURESECONDS)
+        if exposure is not None:
+            try:
+                exposure_times.append(float(exposure))
+            except (ValueError, TypeError):
+                pass
+    return exposure_times
 
 
 def main() -> int:
     """Main entry point."""
+    # Configure logging to stdout with INFO level
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(message)s",
+        handlers=[logging.StreamHandler(sys.stdout)],
+    )
+
     parser = argparse.ArgumentParser(
         description="Generate calibration master frames using PixInsight"
     )
@@ -343,17 +370,17 @@ def main() -> int:
         )
 
         if scripts:
-            print(f"\nGenerated combined script: {Path(scripts[0]).name}")
-            print(f"Script location: {Path(scripts[0]).parent}")
-            print(f"Masters will be output to: {args.output_dir}")
+            logger.info("Generated combined script: %s", Path(scripts[0]).name)
+            logger.info("Script location: %s", Path(scripts[0]).parent)
+            logger.info("Masters will be output to: %s", args.output_dir)
 
             # Execute PixInsight if requested
             if not args.script_only:
                 if not args.pixinsight_binary:
-                    print(
-                        "\nERROR: --pixinsight-binary is required to execute PixInsight"
+                    logger.error(
+                        "--pixinsight-binary is required to execute PixInsight"
                     )
-                    print("Use --script-only to generate scripts without executing")
+                    logger.error("Use --script-only to generate scripts without executing")
                     return 1
 
                 exit_code = run_pixinsight(
@@ -364,29 +391,26 @@ def main() -> int:
                 )
 
                 if exit_code == 0:
-                    print("\nPixInsight execution completed successfully!")
-                    print(f"Master files: {args.output_dir}/master")
-                    print(f"Logs: {args.output_dir}/logs")
+                    logger.info("PixInsight execution completed successfully!")
+                    logger.info("Master files: %s/master", args.output_dir)
+                    logger.info("Logs: %s/logs", args.output_dir)
                 else:
-                    print(
-                        f"\nWARNING: PixInsight exited with code {exit_code}",
-                        file=sys.stderr,
-                    )
+                    logger.warning("PixInsight exited with code %d", exit_code)
                     return exit_code
             else:
-                print("\nScript-only mode: PixInsight execution skipped")
-                print(
-                    f"To execute: {args.pixinsight_binary or '<pixinsight-binary>'} --automation-mode -n={args.instance_id} -r={scripts[0]} --force-exit"
+                logger.info("Script-only mode: PixInsight execution skipped")
+                logger.info(
+                    "To execute: %s --automation-mode -n=%d -r=%s --force-exit",
+                    args.pixinsight_binary or '<pixinsight-binary>',
+                    args.instance_id,
+                    scripts[0],
                 )
         else:
-            print("\nNo calibration frames found to process.")
+            logger.info("No calibration frames found to process.")
 
         return 0
     except Exception as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        import traceback
-
-        traceback.print_exc()
+        logger.exception("Error: %s", e)
         return 1
 
 
