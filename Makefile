@@ -12,7 +12,7 @@ install-dev:
 	$(PYTHON) -m pip install -e ".[dev]"
 
 uninstall:
-	$(PYTHON) -m pip uninstall -y ap-master-calibration
+	$(PYTHON) -m pip uninstall -y ap-create-master
 
 clean:
 	rm -rf build/ dist/ *.egg-info
@@ -21,10 +21,10 @@ clean:
 
 # Format code with black
 format: install-dev
-	$(PYTHON) -m black ap_master_calibration tests
+	$(PYTHON) -m black ap_create_master tests
 
 lint: install-dev
-	$(PYTHON) -m flake8 --max-line-length=88 --extend-ignore=E203,W503,E501,F401 ap_master_calibration tests
+	$(PYTHON) -m flake8 --max-line-length=88 --extend-ignore=E203,W503,E501,F401 ap_create_master tests
 
 # Testing (install deps first, then run tests)
 test: install-dev
@@ -34,7 +34,7 @@ test-verbose: install-dev
 	$(PYTHON) -m pytest -v
 
 typecheck: install-dev
-	$(PYTHON) -m mypy ap_master_calibration || true
+	$(PYTHON) -m mypy ap_create_master || true
 
 coverage: install-dev
-	$(PYTHON) -m pytest --cov=ap_master_calibration --cov-report=term
+	$(PYTHON) -m pytest --cov=ap_create_master --cov-report=term

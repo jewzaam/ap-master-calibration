@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ap-master-calibration"
+name = "ap-create-master"
 version = "0.1.0"
 description = "Automated master calibration frame generation for PixInsight"
 readme = "README.md"
@@ -33,7 +33,7 @@ dependencies = [
 ]
 
 [project.scripts]
-ap-master-calibration = "ap_master_calibration.calibrate_masters:main"
+ap-create-master = "ap_create_master.calibrate_masters:main"
 
 [project.optional-dependencies]
 dev = [
@@ -45,7 +45,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["ap_master_calibration"]
+packages = ["ap_create_master"]
 
 [tool.setuptools.package-data]
 "*" = ["*.txt", "*.md"]
