@@ -1,4 +1,4 @@
-# ap-master-calibration
+# ap-create-master
 
 [![Test](https://github.com/jewzaam/ap-create-master/actions/workflows/test.yml/badge.svg)](https://github.com/jewzaam/ap-create-master/actions/workflows/test.yml)
 [![Coverage](https://github.com/jewzaam/ap-create-master/actions/workflows/coverage.yml/badge.svg)](https://github.com/jewzaam/ap-create-master/actions/workflows/coverage.yml)
@@ -36,20 +36,20 @@ make install-dev
 ### From Git
 
 ```bash
-pip install git+https://github.com/jewzaam/ap-master-calibration.git
+pip install git+https://github.com/jewzaam/ap-create-master.git
 ```
 
 ## Quick Start
 
 **Generate bias/dark masters:**
 ```bash
-python -m ap_master_calibration /path/to/calibration /path/to/output \
+python -m ap_create_master /path/to/calibration /path/to/output \
     --pixinsight-binary "C:\Program Files\PixInsight\bin\PixInsight.exe"
 ```
 
 **Generate flat masters using existing library:**
 ```bash
-python -m ap_master_calibration /path/to/flats /path/to/output \
+python -m ap_create_master /path/to/flats /path/to/output \
     --bias-master-dir /path/to/bias/library \
     --dark-master-dir /path/to/dark/library \
     --pixinsight-binary "C:\Program Files\PixInsight\bin\PixInsight.exe"
@@ -57,7 +57,7 @@ python -m ap_master_calibration /path/to/flats /path/to/output \
 
 **Generate scripts without executing:**
 ```bash
-python -m ap_master_calibration /path/to/calibration /path/to/output --script-only
+python -m ap_create_master /path/to/calibration /path/to/output --script-only
 ```
 
 ## Important Limitation
@@ -66,11 +66,11 @@ Masters created in a run are **not used** for flat calibration in that same run.
 
 ```bash
 # Stage 1: Generate bias/darks
-python -m ap_master_calibration ./bias_and_darks ./masters \
+python -m ap_create_master ./bias_and_darks ./masters \
     --pixinsight-binary "C:\Program Files\PixInsight\bin\PixInsight.exe"
 
 # Stage 2: Generate flats using the masters from stage 1
-python -m ap_master_calibration ./flats ./output \
+python -m ap_create_master ./flats ./output \
     --bias-master-dir ./masters/master \
     --dark-master-dir ./masters/master \
     --pixinsight-binary "C:\Program Files\PixInsight\bin\PixInsight.exe"
@@ -111,7 +111,7 @@ Frames must have proper FITS keywords:
 ## Command Line Options
 
 ```
-python -m ap_master_calibration [-h] [--bias-master-dir DIR] [--dark-master-dir DIR]
+python -m ap_create_master [-h] [--bias-master-dir DIR] [--dark-master-dir DIR]
                                 [--script-dir DIR] [--pixinsight-binary PATH]
                                 [--instance-id ID] [--no-force-exit] [--script-only]
                                 input_dir output_dir
@@ -131,7 +131,7 @@ optional arguments:
   --script-only         Generate scripts only, do not execute PixInsight
 ```
 
-Run `python -m ap_master_calibration --help` for full details.
+Run `python -m ap_create_master --help` for full details.
 
 ## How It Works
 
@@ -186,11 +186,11 @@ pytest tests/
 
 Run with coverage:
 ```bash
-pytest tests/ --cov=ap_master_calibration
+pytest tests/ --cov=ap_create_master
 ```
 
 Format code:
 ```bash
-black ap_master_calibration/ tests/
-ruff check ap_master_calibration/ tests/
+black ap_create_master/ tests/
+ruff check ap_create_master/ tests/
 ```
